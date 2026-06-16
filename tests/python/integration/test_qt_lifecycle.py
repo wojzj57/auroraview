@@ -101,7 +101,7 @@ class TestQtWebViewLifecycle:
             webview.closeEvent(event)
 
             # Should not raise even though the underlying WebView has been closed
-            webview.emit("test_event", {"value": 1})
+            webview.send_event("test_event", {"value": 1})
         finally:
             webview.deleteLater()
 

@@ -621,17 +621,17 @@ class TestGuardedApiMethods:
 
     def test_emit_noop_when_not_alive(self):
         host = _ApiHost(alive=False)
-        QtWebView.emit(host, "ev", {"k": 1})
+        QtWebView.send_event(host, "ev", {"k": 1})
         host._webview.emit.assert_not_called()
 
     def test_emit_dispatches_with_auto_process(self):
         host = _ApiHost(alive=True)
-        QtWebView.emit(host, "ev", {"k": 1})
+        QtWebView.send_event(host, "ev", {"k": 1})
         host._webview.emit.assert_called_once_with("ev", {"k": 1}, auto_process=True)
 
     def test_emit_respects_explicit_auto_process_false(self):
         host = _ApiHost(alive=True)
-        QtWebView.emit(host, "ev", {"k": 1}, auto_process=False)
+        QtWebView.send_event(host, "ev", {"k": 1}, auto_process=False)
         host._webview.emit.assert_called_once_with("ev", {"k": 1}, auto_process=False)
 
     def test_load_file_noop_when_not_alive(self, tmp_path):

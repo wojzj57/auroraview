@@ -63,13 +63,20 @@ Load HTML content.
 webview.load_html("<h1>Hello</h1>")
 ```
 
-### emit(event: str, data: Any)
+### send_event(event: str, data: Any)
 
 Emit an event to JavaScript.
 
 ```python
-webview.emit("update", {"value": 42})
+webview.send_event("update", {"value": 42})
 ```
+
+> **Migration note:** This method was previously named `emit`. It was
+> renamed because `QtWebView` is a `QObject` subclass — a method named
+> `emit` shadows Qt's `SignalInstance.emit` and silently breaks every Qt
+> signal on the widget (`urlChanged`, `aboutToClose`, ...). Use
+> `send_event(...)` for IPC; old `webview.emit(...)` calls now raise
+> `TypeError`.
 
 ### bind_api(obj: object)
 
@@ -232,6 +239,6 @@ class Worker(QThread):
 
 # Connect to WebView
 worker = Worker()
-worker.result_ready.connect(lambda data: webview.emit("data_ready", data))
+worker.result_ready.connect(lambda data: webview.send_event("data_ready", data))
 worker.start()
 ```

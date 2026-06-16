@@ -827,11 +827,20 @@ class QtWebView(LifecycleMixin, EmbeddingMixin, FileDialogMixin, QWidget):
         self._webview.eval_js(script)
 
     @_guard_alive
-    def emit(self, event_name: str, data: Any = None, auto_process: bool = True) -> None:
+    def send_event(self, event_name: str, data: Any = None, auto_process: bool = True) -> None:
         """Emit an AuroraView event to the embedded WebView.
 
         Safe to call at any point in the widget lifecycle. If the widget
         is closing or destroyed, this is a silent no-op.
+
+        .. note::
+            This method was previously named ``emit``. It was renamed because
+            ``QtWebView`` is a ``QObject`` subclass, and defining a member
+            named ``emit`` shadows PySide6's ``SignalInstance.emit`` — which
+            silently broke **every** Qt signal on the widget (``aboutToClose``,
+            ``urlChanged``, ``ipcMessageReceived``, ...). Use ``send_event``
+            to push IPC events to JavaScript; use the Qt signals' own
+            ``.emit()`` for signal emission.
         """
         self._webview.emit(event_name, data, auto_process=auto_process)
 

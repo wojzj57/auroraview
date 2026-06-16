@@ -69,7 +69,7 @@ class TestZombieReferenceFix:
             webview.deleteLater()
 
     def test_emit_after_close_is_noop(self, qapp):
-        """emit() should be a no-op after closeEvent, not raise."""
+        """send_event() should be a no-op after closeEvent, not raise."""
         from qtpy.QtGui import QCloseEvent
 
         from auroraview import QtWebView
@@ -79,7 +79,7 @@ class TestZombieReferenceFix:
             event = QCloseEvent()
             webview.closeEvent(event)
             # Should NOT raise RuntimeError
-            webview.emit("test_event", {"value": 42})
+            webview.send_event("test_event", {"value": 42})
         finally:
             webview.deleteLater()
 
@@ -190,6 +190,7 @@ class TestZombieReferenceFix:
         from unittest.mock import MagicMock
 
         from qtpy.QtCore import QSize
+        from qtpy.QtGui import QResizeEvent
 
         from auroraview import QtWebView
 
@@ -202,11 +203,13 @@ class TestZombieReferenceFix:
             )
             webview._webview_container = mock_container
 
-            mock_event = MagicMock()
-            mock_event.size.return_value = QSize(800, 600)
+            # resizeEvent calls super().resizeEvent(event), which requires a
+            # real QResizeEvent (a MagicMock raises TypeError before the
+            # dead-container branch under test is reached).
+            event = QResizeEvent(QSize(800, 600), QSize(640, 480))
 
             with caplog.at_level(logging.WARNING):
-                webview.resizeEvent(mock_event)
+                webview.resizeEvent(event)
 
             # Container should be cleared
             assert webview._webview_container is None
@@ -227,7 +230,43 @@ class TestZombieReferenceFix:
         assert webview._is_closing is True
         assert len(received) == 1
 
-    def test_multiple_destroy_calls_safe(self, qapp):
+    def test_qt_signals_not_shadowed_by_send_event(self, qapp):
+        """Regression: a member named ``emit`` shadows Qt's SignalInstance.emit.
+
+        QtWebView's IPC method used to be named ``emit``; because QtWebView is
+        a QObject, that silently broke EVERY Qt signal (signal.emit() dispatched
+        to the IPC method instead of firing the signal). This guards against a
+        future rename back to ``emit``: a directly-emitted Qt signal must reach
+        its connected slot, and the IPC method must live under ``send_event``.
+        """
+        from auroraview import QtWebView
+
+        webview = QtWebView()
+        try:
+            # The IPC method must NOT be named emit in QtWebView's own class
+            # body (QObject provides a built-in emit, so checking the class
+            # __dict__ is what matters — a QtWebView-defined emit would shadow
+            # SignalInstance.emit).
+            assert "emit" not in vars(QtWebView)
+            assert callable(webview.send_event)
+
+            # A Qt signal emitted directly must reach its slot.
+            url_received = []
+            webview.urlChanged.connect(url_received.append)
+            webview.urlChanged.emit("https://example.com")
+            assert url_received == ["https://example.com"]
+
+            # A second signal with a different arity, to be thorough.
+            ipc_received = []
+            webview.ipcMessageReceived.connect(
+                lambda name, data: ipc_received.append((name, data))
+            )
+            webview.ipcMessageReceived.emit("evt", {"k": 1})
+            assert ipc_received == [("evt", {"k": 1})]
+        finally:
+            webview.deleteLater()
+
+
         """Calling destroy() multiple times should not crash."""
         from auroraview import QtWebView
 
